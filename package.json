@@ -1,0 +1,13 @@
+{
+  "name": "gesturelearn-x",
+  "version": "1.0.0",
+  "description": "Hand-tracking based 3D interactive learning & design system (MediaPipe + Three.js). Fully browser-based, zero-build.",
+  "private": true,
+  "scripts": {
+    "dev": "npx --yes serve -l 5173 .",
+    "start": "npx --yes serve -l 5173 ."
+  },
+  "keywords": ["mediapipe", "three.js", "hand-tracking", "gesture-control", "webgl", "3d", "touchless"],
+  "author": "Mohammed Junayd Ali M, Nova Antony Rohan E",
+  "license": "MIT"
+}

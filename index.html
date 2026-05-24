@@ -1,0 +1,1071 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GestureLearn X — Touchless 3D Interaction System</title>
+<style>
+  :root{
+    --bg:#0a0a0f; --panel:#111118; --panel2:#0d0d14; --border:#222230;
+    --text:#e8e8e8; --muted:#8b8b9a; --accent:#8888ff; --green:#00ff88; --cyan:#33ffcc;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:"SF Mono",Menlo,Consolas,monospace;
+    background:var(--bg); color:var(--text); overflow:hidden;
+  }
+  #app{display:flex; height:100vh;}
+
+  /* ---- Sidebar ---- */
+  #sidebar{
+    width:182px; flex-shrink:0; background:var(--panel2);
+    border-right:1px solid var(--border); padding:16px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  #sidebar .brand{
+    color:#555; font-size:10px; text-transform:uppercase;
+    letter-spacing:2px; margin-bottom:8px;
+  }
+  #sidebar .brand b{color:var(--accent);}
+  .modeBtn{
+    font:inherit; font-size:12px; text-align:left;
+    padding:10px 12px; border-radius:6px; cursor:pointer;
+    background:transparent; border:1px solid var(--border); color:#666;
+  }
+  .modeBtn.active{background:#1a1a3a; border-color:#4444aa; color:var(--accent);}
+  #sidebar .foot{margin-top:auto; color:#333; font-size:10px; line-height:1.7;}
+
+  /* ---- Stage ---- */
+  #stage{flex:1; position:relative; min-width:0;}
+  #glcanvas{width:100%; height:100%; display:block;}
+
+  .topbar{
+    position:absolute; top:12px; left:50%; transform:translateX(-50%);
+    background:rgba(13,13,20,.82); border:1px solid var(--border);
+    border-radius:8px; padding:6px 14px; font-size:11px; color:var(--muted);
+    white-space:nowrap;
+  }
+  .topbar b{color:var(--text);}
+
+  #gestureBadge{
+    position:absolute; bottom:16px; left:16px;
+    background:rgba(13,13,20,.85); border:1px solid var(--border);
+    border-radius:8px; padding:8px 14px;
+  }
+  #gestureBadge .lbl{font-size:10px; color:#555; text-transform:uppercase; letter-spacing:1px;}
+  #gestureBadge .val{font-size:15px; color:var(--green); margin-top:2px;}
+  #gestureBadge .fps{font-size:10px; color:#556; margin-top:4px;}
+
+  /* tool panels */
+  .toolPanel{
+    position:absolute; top:14px; left:14px;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .toolPanel .grp{font-size:9px; color:#555; text-transform:uppercase;
+    letter-spacing:1px; margin:4px 0 0;}
+  .toolBtn{
+    font:inherit; font-size:11px; background:#1a1a2a;
+    border:1px solid #334; color:#bbb; padding:7px 11px;
+    border-radius:6px; cursor:pointer; text-align:left;
+  }
+  .toolBtn:hover{border-color:#5555aa; color:#fff;}
+  .toolBtn.danger:hover{border-color:#aa4444; color:#fff;}
+  .swatches{display:flex; gap:6px;}
+  .sw{width:22px; height:22px; border-radius:5px; cursor:pointer; border:2px solid #0000;}
+  .sw.active{border-color:#fff;}
+
+  /* webcam thumbnail */
+  #camWrap{
+    position:absolute; bottom:16px; right:16px;
+    width:200px; height:150px; border:1px solid #333;
+    border-radius:8px; overflow:hidden; background:#000;
+  }
+  #camWrap video,#camWrap canvas{
+    position:absolute; inset:0; width:100%; height:100%; transform:scaleX(-1);
+  }
+  #camWrap video{object-fit:cover;}
+  #camHint{
+    position:absolute; inset:0; display:flex; align-items:center;
+    justify-content:center; text-align:center; font-size:10px;
+    color:#666; padding:10px; transform:none;
+  }
+
+  /* ---- Right info panel ---- */
+  #infoPanel{
+    width:288px; flex-shrink:0; background:var(--panel);
+    border-left:1px solid var(--border); padding:16px;
+    display:flex; flex-direction:column; gap:14px; overflow:auto;
+  }
+  .sect .cap{font-size:10px; color:#555; text-transform:uppercase;
+    letter-spacing:1px; margin-bottom:6px;}
+  #curGesture{color:var(--green); font-size:13px;}
+  .card{border-radius:8px; padding:12px; border:1px solid var(--border); background:#1a1a28;}
+  .card .name{font-weight:600; font-size:14px; margin-bottom:6px;}
+  .card .desc{color:#ccc; font-size:12px; line-height:1.6;}
+  .placeholder{color:#555; font-size:12px; line-height:1.6;}
+  .transformRow{display:flex; justify-content:space-between; font-size:11px; color:#aaa; padding:2px 0;}
+  .transformRow span:first-child{color:#666;}
+  .guide{margin-top:auto; font-size:10px; color:#444; line-height:1.9;}
+  .guide .gh{color:#555; margin-bottom:3px;}
+  .guide b{color:#888;}
+
+  /* ---- AI tutor panel ---- */
+  .aiHeader{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+  .aiDot{width:8px; height:8px; border-radius:50%; background:var(--green);
+    box-shadow:0 0 8px var(--green); animation:pulse 1.4s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+  .aiName{font-size:10px; color:var(--green); text-transform:uppercase; letter-spacing:1.5px;}
+  .aiBubble{background:#13131d; border:1px solid #2a2a3a;
+    border-radius:10px; border-top-left-radius:2px; padding:12px;}
+  .aiBubble .pname{font-weight:600; font-size:15px; margin-bottom:7px;}
+  .aiText{color:#d8d8e4; font-size:12px; line-height:1.75;}
+  .cursor{color:var(--green); font-weight:700;}
+  .facts{margin:10px 0 0 16px; color:#9a9aaa; font-size:11px; line-height:1.7;}
+  .aiHint{font-size:10px; color:#4a4a5a; margin-top:9px; line-height:1.7;}
+  .speaking{color:var(--cyan);}
+
+  /* start overlay */
+  #startOverlay{
+    position:absolute; inset:0; background:rgba(10,10,15,.93);
+    display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:14px; z-index:20; text-align:center;
+  }
+  #startOverlay h1{font-size:22px; letter-spacing:1px;}
+  #startOverlay h1 b{color:var(--accent);}
+  #startOverlay p{color:var(--muted); font-size:12px; max-width:400px; line-height:1.6;}
+  #startBtn{
+    font:inherit; font-size:14px; padding:11px 26px; border-radius:8px;
+    border:1px solid #4444aa; background:var(--accent); color:#06061a;
+    font-weight:700; cursor:pointer;
+  }
+  #startStatus{font-size:11px; color:#666; min-height:14px;}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <div id="sidebar">
+    <div class="brand">Gesture<b>Learn</b> X</div>
+    <button class="modeBtn active" data-mode="learn">Learning Mode</button>
+    <button class="modeBtn" data-mode="design">Design Mode</button>
+    <button class="modeBtn" data-mode="draw">Air Draw Mode</button>
+    <div class="foot">
+      Powered by<br>MediaPipe&nbsp;+&nbsp;Three.js<br><br>
+      Touchless · webcam-only<br>7-gesture vocabulary
+    </div>
+  </div>
+
+  <!-- ============ STAGE ============ -->
+  <div id="stage">
+    <canvas id="glcanvas"></canvas>
+
+    <div class="topbar" id="topbar"></div>
+
+    <!-- design tools -->
+    <div id="designTools" class="toolPanel hidden">
+      <div class="grp">Add shape</div>
+      <button class="toolBtn" data-add="box">+ Cube</button>
+      <button class="toolBtn" data-add="sphere">+ Sphere</button>
+      <button class="toolBtn" data-add="cylinder">+ Cylinder</button>
+      <button class="toolBtn" data-add="cone">+ Cone</button>
+      <button class="toolBtn" data-add="torus">+ Torus</button>
+      <button class="toolBtn" data-add="line">+ Line</button>
+      <div class="grp">Object</div>
+      <button class="toolBtn" data-act="duplicate">⧉ Duplicate selected</button>
+      <button class="toolBtn danger" data-act="delete">✕ Delete selected</button>
+      <button class="toolBtn danger" data-act="clear">Clear all</button>
+    </div>
+
+    <!-- draw tools -->
+    <div id="drawTools" class="toolPanel hidden">
+      <div class="grp">Air draw — point to draw</div>
+      <div class="swatches" id="swatches">
+        <div class="sw active" style="background:#33ffcc" data-color="#33ffcc"></div>
+        <div class="sw" style="background:#ff5fa2" data-color="#ff5fa2"></div>
+        <div class="sw" style="background:#ffd24a" data-color="#ffd24a"></div>
+        <div class="sw" style="background:#8aa0ff" data-color="#8aa0ff"></div>
+      </div>
+      <button class="toolBtn" data-act="undoStroke">↶ Undo last stroke</button>
+      <button class="toolBtn danger" data-act="clearDraw">Clear drawing</button>
+    </div>
+
+    <div id="gestureBadge">
+      <div class="lbl">Active gesture</div>
+      <div class="val" id="badgeVal">—</div>
+      <div class="fps" id="fpsVal">— fps</div>
+    </div>
+
+    <div id="camWrap">
+      <video id="video" playsinline></video>
+      <canvas id="camCanvas" width="320" height="240"></canvas>
+      <div id="camHint">camera off</div>
+    </div>
+
+    <div id="startOverlay">
+      <h1>Gesture<b>Learn</b> X</h1>
+      <p>Touchless 3D interaction system — hand tracking + Three.js.
+         Explore a 3D model with an AI tutor, build &amp; manipulate shapes,
+         or draw in the air. Allow camera access to begin.</p>
+      <button id="startBtn">Start camera</button>
+      <div id="startStatus"></div>
+    </div>
+  </div>
+
+  <!-- ============ INFO PANEL ============ -->
+  <div id="infoPanel">
+    <div class="sect">
+      <div class="cap">Current gesture</div>
+      <div id="curGesture">No gesture detected</div>
+    </div>
+    <div id="panelBody"></div>
+    <div class="guide">
+      <div class="gh">GESTURE GUIDE</div>
+      <div id="guideText"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MediaPipe (classic scripts expose window.Hands / window.Camera) -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============================================================
+   GestureLearn X — touchless 3D interaction system (single file)
+   Modes:  Learning · Design · Air Draw
+   Gestures: Point · Fist · Pinch · Open Palm · Victory · Thumbs Up · Three
+   This build: AI tutor panel (typewriter + speak-aloud), pointing
+   reticle, 3 extra gestures, stronger smoothing.
+   ============================================================ */
+
+// ---------- DOM ----------
+const canvas      = document.getElementById('glcanvas');
+const stage       = document.getElementById('stage');
+const video       = document.getElementById('video');
+const camCanvas   = document.getElementById('camCanvas');
+const camCtx      = camCanvas.getContext('2d');
+const camHint     = document.getElementById('camHint');
+const badgeVal    = document.getElementById('badgeVal');
+const fpsVal      = document.getElementById('fpsVal');
+const curGesture  = document.getElementById('curGesture');
+const panelBody   = document.getElementById('panelBody');
+const guideText   = document.getElementById('guideText');
+const topbar      = document.getElementById('topbar');
+const designTools = document.getElementById('designTools');
+const drawTools   = document.getElementById('drawTools');
+const startOverlay= document.getElementById('startOverlay');
+const startBtn    = document.getElementById('startBtn');
+const startStatus = document.getElementById('startStatus');
+
+// ---------- App state ----------
+let mode = 'learn';                 // 'learn' | 'design' | 'draw'
+let selectedPart = null;            // heart part name (learn)
+let selectedObj  = null;            // THREE.Object3D (design)
+let strokeColor  = '#33ffcc';
+let autoOrbit    = false;
+let pendingType  = false;           // animate the AI text on next render
+
+// gesture smoothing
+let smoothLm = null, prevSmooth = null;
+let stableGesture = 'none', rawGesture = 'none', rawCount = 0, lastStableG = 'none';
+const STABLE_FRAMES = 3;
+const LM_ALPHA = 0.40;              // landmark smoothing (lower = smoother)
+
+// learn-mode interaction state
+let hoverPart = null, hoverCount = 0;
+let heartRotX = 0, heartRotY = 0;   // smoothed rotation targets
+let zoomTarget = 5;                 // smoothed camera zoom target
+let grabbing = false;
+
+// ============================================================
+//  THREE.JS SCENE
+// ============================================================
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));   // FPS guard
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0f);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+camera.position.set(0, 0.4, 5);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
+keyLight.position.set(4, 6, 5);
+scene.add(keyLight);
+const rimLight = new THREE.DirectionalLight(0x4466ff, 0.45);
+rimLight.position.set(-5, -2, -4);
+scene.add(rimLight);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+// raycasting (tuned for better selection, incl. lines)
+const raycaster = new THREE.Raycaster();
+raycaster.params.Line.threshold = 0.16;
+raycaster.params.Points.threshold = 0.1;
+const drawPlane = new THREE.Plane();
+const hitPoint  = new THREE.Vector3();
+const camRight  = new THREE.Vector3();
+const camUp     = new THREE.Vector3();
+const camDir    = new THREE.Vector3();
+const worldDelta= new THREE.Vector3();
+
+// pointing reticle (learn mode)
+const reticle = new THREE.Mesh(
+  new THREE.SphereGeometry(0.07, 16, 12),
+  new THREE.MeshBasicMaterial({ color:0x33ffcc })
+);
+reticle.visible = false;
+scene.add(reticle);
+
+// selection box helper (design mode)
+let selBox = null;
+function setSelBox(obj){
+  if (selBox){ scene.remove(selBox); selBox.geometry.dispose(); selBox = null; }
+  if (obj){ selBox = new THREE.BoxHelper(obj, 0x33ffcc); scene.add(selBox); }
+}
+
+function resize(){
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+// ============================================================
+//  LEARNING MODE — stylised 3D heart of named parts + AI tutor
+// ============================================================
+const heartGroup = new THREE.Group();
+scene.add(heartGroup);
+
+const KNOWLEDGE = {
+  left_ventricle:{ label:'Left Ventricle', color:0xff4a4a,
+    ai:"Good pick — this is the Left Ventricle, the strongest chamber of the heart. Think of it as the main engine: every beat, it squeezes oxygen-rich blood out through the aorta and all the way around your body. That is why its muscular wall is the thickest of all four chambers.",
+    facts:['Thickest, most muscular chamber','Wall thickness ~10–15 mm','Generates systemic blood pressure'] },
+  right_ventricle:{ label:'Right Ventricle', color:0x4a8fff,
+    ai:"You are looking at the Right Ventricle. Its job is shorter but vital — it pushes oxygen-poor blood the short distance to your lungs through the pulmonary artery. Because that trip is low-pressure, its wall is noticeably thinner than the left ventricle's.",
+    facts:['Thinner wall than the left ventricle','Pumps to the low-pressure lung circuit','Crescent-shaped in cross-section'] },
+  left_atrium:{ label:'Left Atrium', color:0xff6b6b,
+    ai:"This is the Left Atrium, one of the two upper collecting chambers. It catches freshly oxygenated blood arriving back from the lungs through four pulmonary veins, then gently passes it down into the left ventricle.",
+    facts:['Fed by 4 pulmonary veins','Sits at the back of the heart','Empties into the left ventricle'] },
+  right_atrium:{ label:'Right Atrium', color:0x6b9fff,
+    ai:"That is the Right Atrium. It receives oxygen-poor blood returning from the whole body through the two large vena cava veins. It also houses the SA node — the heart's natural pacemaker that sets the rhythm of every heartbeat.",
+    facts:['Fed by the superior & inferior vena cava','Contains the sinoatrial (SA) node','The heart’s natural pacemaker'] },
+  aorta:{ label:'Aorta', color:0xff8c4a,
+    ai:"This is the Aorta — the largest artery in the human body. It arches up out of the left ventricle and branches off to deliver oxygen-rich blood to your head, your arms, and the rest of your trunk.",
+    facts:['Largest artery in the human body','Arches over the heart','Feeds the head, arms & trunk'] },
+  pulmonary_artery:{ label:'Pulmonary Artery', color:0xa64aff,
+    ai:"You have selected the Pulmonary Artery. It is unusual — it is the only artery that carries oxygen-poor blood. It takes blood from the right ventricle and splits into two branches, one heading to each lung to pick up oxygen.",
+    facts:['Only artery carrying deoxygenated blood','Splits into left & right branches','Leads to the pulmonary circuit'] }
+};
+const PART_ORDER = Object.keys(KNOWLEDGE);
+
+function makePart(name, geo, x, y, z, rot){
+  const base = new THREE.Color(KNOWLEDGE[name].color);
+  const mat = new THREE.MeshStandardMaterial({
+    color: base.clone().multiplyScalar(0.55),
+    roughness:0.55, metalness:0.15, emissive:0x000000
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x,y,z);
+  if (rot) mesh.rotation.set(rot[0],rot[1],rot[2]);
+  mesh.name = name;
+  mesh.userData.isPart = true;
+  mesh.userData.baseColor = base;
+  heartGroup.add(mesh);
+}
+makePart('left_ventricle',  new THREE.ConeGeometry(0.62,1.5,24),  -0.35,-0.55,0,[Math.PI,0.15,0]);
+makePart('right_ventricle', new THREE.ConeGeometry(0.5,1.25,24),   0.5,-0.42,0.05,[Math.PI,-0.2,0.25]);
+makePart('left_atrium',     new THREE.SphereGeometry(0.5,24,18),  -0.45,0.55,-0.1);
+makePart('right_atrium',    new THREE.SphereGeometry(0.46,24,18),  0.6,0.5,0);
+makePart('aorta',           new THREE.CylinderGeometry(0.17,0.2,1.5,18), -0.05,1.05,-0.05,[0,0,0.35]);
+makePart('pulmonary_artery',new THREE.CylinderGeometry(0.15,0.17,1.3,18), 0.42,1.0,0.1,[0.1,0,-0.45]);
+heartGroup.scale.setScalar(1.05);
+
+// ============================================================
+//  DESIGN MODE — gesture-driven shape workspace
+// ============================================================
+const designGroup = new THREE.Group();
+designGroup.visible = false;
+scene.add(designGroup);
+const grid = new THREE.GridHelper(8,16,0x2a2a3a,0x16161f);
+grid.position.y = -1.6;
+designGroup.add(grid);
+
+const designObjects = [];
+let shapeCount = 0;
+
+function initTargets(obj){
+  obj.userData.targetPos   = obj.position.clone();
+  obj.userData.targetRotX  = obj.rotation.x;
+  obj.userData.targetRotY  = obj.rotation.y;
+  obj.userData.targetScale = obj.scale.x;
+}
+function makeGeometry(kind){
+  switch(kind){
+    case 'box':      return new THREE.BoxGeometry(0.7,0.7,0.7);
+    case 'sphere':   return new THREE.SphereGeometry(0.45,28,20);
+    case 'cylinder': return new THREE.CylinderGeometry(0.4,0.4,0.9,28);
+    case 'cone':     return new THREE.ConeGeometry(0.45,0.9,28);
+    case 'torus':    return new THREE.TorusGeometry(0.42,0.16,16,32);
+  }
+}
+function buildShape(kind, color){
+  let obj;
+  if (kind === 'line'){
+    const lgeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.6,0,0), new THREE.Vector3(0.6,0,0)
+    ]);
+    obj = new THREE.Line(lgeo, new THREE.LineBasicMaterial({ color: color || 0x9aa0ff }));
+    const hit = new THREE.Mesh(
+      new THREE.BoxGeometry(1.25,0.22,0.22),
+      new THREE.MeshBasicMaterial({ visible:false })
+    );
+    obj.add(hit);
+  } else {
+    const col = color ? new THREE.Color(color)
+                      : new THREE.Color().setHSL((0.58 + shapeCount*0.13)%1, 0.5, 0.6);
+    obj = new THREE.Mesh(makeGeometry(kind), new THREE.MeshStandardMaterial({
+      color: col, roughness:0.35, metalness:0.45, emissive:0x000000
+    }));
+    obj.userData.baseColor = col;
+  }
+  obj.userData.kind = kind;
+  obj.userData.isShape = true;
+  return obj;
+}
+function addShape(kind){
+  const obj = buildShape(kind);
+  obj.position.set((Math.random()-0.5)*1.6,(Math.random()-0.1)*1.0,(Math.random()-0.5)*0.6);
+  obj.name = kind + '_' + (++shapeCount);
+  initTargets(obj);
+  designGroup.add(obj);
+  designObjects.push(obj);
+  selectObject(obj);
+}
+function duplicateSelected(){
+  if (!selectedObj) return;
+  const o = selectedObj;
+  const clone = o.clone(true);
+  clone.material = o.material.clone();
+  clone.userData = Object.assign({}, o.userData);
+  if (o.userData.baseColor) clone.userData.baseColor = o.userData.baseColor.clone();
+  clone.position.copy(o.position).add(new THREE.Vector3(0.5,0.4,0));
+  clone.rotation.copy(o.rotation);
+  clone.scale.copy(o.scale);
+  clone.name = o.userData.kind + '_' + (++shapeCount);
+  initTargets(clone);
+  designGroup.add(clone);
+  designObjects.push(clone);
+  selectObject(clone);
+}
+function deleteSelected(){
+  if (!selectedObj) return;
+  const i = designObjects.indexOf(selectedObj);
+  if (i >= 0) designObjects.splice(i,1);
+  designGroup.remove(selectedObj);
+  selectObject(null);
+}
+function clearShapes(){
+  for (const o of designObjects) designGroup.remove(o);
+  designObjects.length = 0;
+  selectObject(null);
+}
+function resetSelected(){
+  if (!selectedObj) return;
+  selectedObj.userData.targetRotX = 0;
+  selectedObj.userData.targetRotY = 0;
+  selectedObj.userData.targetScale = 1;
+  renderPanel();
+}
+function highlightObj(obj,on){
+  if (!obj) return;
+  if (obj.isLine){
+    obj.material.color.set(on ? 0xffffff : 0x9aa0ff);
+  } else if (obj.material && obj.material.emissive){
+    obj.material.emissive.set(on ? 0x223377 : 0x000000);
+  }
+}
+function selectObject(obj){
+  if (selectedObj) highlightObj(selectedObj,false);
+  selectedObj = obj;
+  if (selectedObj) highlightObj(selectedObj,true);
+  setSelBox(obj);
+  renderPanel();
+}
+
+// ============================================================
+//  AIR DRAW MODE — index-finger 3D strokes
+// ============================================================
+const drawGroup = new THREE.Group();
+drawGroup.visible = false;
+scene.add(drawGroup);
+const drawGrid = new THREE.GridHelper(8,16,0x223,0x14141c);
+drawGrid.position.y = -1.8;
+drawGroup.add(drawGrid);
+
+const strokes = [];
+let currentStroke = null;
+const MAX_PTS = 3000;
+const lastDrawPt = new THREE.Vector3();
+const DRAW_COLORS = ['#33ffcc','#ff5fa2','#ffd24a','#8aa0ff'];
+
+function newStroke(){
+  const geo = new THREE.BufferGeometry();
+  const arr = new Float32Array(MAX_PTS*3);
+  geo.setAttribute('position', new THREE.BufferAttribute(arr,3));
+  geo.setDrawRange(0,0);
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: strokeColor }));
+  line.userData.count = 0;
+  line.userData.arr = arr;
+  drawGroup.add(line);
+  strokes.push(line);
+  return line;
+}
+function pushStrokePoint(line, v){
+  const i = line.userData.count;
+  if (i >= MAX_PTS) return;
+  const a = line.userData.arr;
+  a[i*3]=v.x; a[i*3+1]=v.y; a[i*3+2]=v.z;
+  line.userData.count = i+1;
+  line.geometry.setDrawRange(0, i+1);
+  line.geometry.attributes.position.needsUpdate = true;
+}
+function clearDrawing(){
+  for (const s of strokes){ drawGroup.remove(s); s.geometry.dispose(); }
+  strokes.length = 0;
+  currentStroke = null;
+  renderPanel();
+}
+function undoStroke(){
+  const s = strokes.pop();
+  if (s){ drawGroup.remove(s); s.geometry.dispose(); }
+  currentStroke = null;
+  renderPanel();
+}
+function cycleColor(){
+  let i = DRAW_COLORS.indexOf(strokeColor);
+  strokeColor = DRAW_COLORS[(i+1) % DRAW_COLORS.length];
+  document.querySelectorAll('.sw').forEach(s=>
+    s.classList.toggle('active', s.dataset.color === strokeColor));
+  renderPanel();
+}
+
+// ============================================================
+//  GESTURE CLASSIFIER + LANDMARK SMOOTHING
+// ============================================================
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y, (a.z||0)-(b.z||0)); }
+
+function smoothLandmarks(lm){
+  if (!lm){ smoothLm = null; return null; }
+  if (!smoothLm || smoothLm.length !== lm.length){
+    smoothLm = lm.map(p=>({x:p.x,y:p.y,z:p.z||0}));
+    return smoothLm;
+  }
+  for (let i=0;i<lm.length;i++){
+    smoothLm[i].x += (lm[i].x - smoothLm[i].x) * LM_ALPHA;
+    smoothLm[i].y += (lm[i].y - smoothLm[i].y) * LM_ALPHA;
+    smoothLm[i].z += ((lm[i].z||0) - smoothLm[i].z) * LM_ALPHA;
+  }
+  return smoothLm;
+}
+
+function classify(lm){
+  if (!lm) return 'none';
+  const tips=[8,12,16,20], pips=[6,10,14,18];
+  const ext = i => lm[tips[i]].y < lm[pips[i]].y - 0.015;
+  const e = [ext(0),ext(1),ext(2),ext(3)];
+  const extCount = e.filter(Boolean).length;
+  const handScale = dist(lm[0], lm[9]) || 1;
+
+  // pinch: thumb tip near index tip, with at least one finger up (not a fist)
+  if (dist(lm[4],lm[8]) < handScale*0.42 && extCount > 0) return 'pinch';
+
+  if (extCount === 4) return 'open_palm';
+  if (extCount === 3 && e[0] && e[1] && e[2]) return 'three';
+  if (extCount === 2 && e[0] && e[1]) return 'victory';
+  if (extCount === 1 && e[0]) return 'point';
+  if (extCount === 0){
+    // thumbs up: thumb tip clearly above its MCP joint, fingers curled
+    if (lm[4].y < lm[2].y - 0.04) return 'thumbsup';
+    return 'fist';
+  }
+  return 'none';
+}
+
+// stable palm centroid = mean of wrist + finger MCPs
+function palmCentroid(lm){
+  const ids=[0,5,9,13,17]; let x=0,y=0;
+  for (const i of ids){ x+=lm[i].x; y+=lm[i].y; }
+  return { x:x/ids.length, y:y/ids.length };
+}
+// index fingertip → NDC (mirrored to match the webcam view)
+function fingertipNDC(lm){
+  return { x:(lm[8].x*2-1)*-1, y:-(lm[8].y*2-1) };
+}
+// normalised image-space delta → world offset in the camera's view plane
+function screenDeltaToWorld(dcx, dcy, distance, out){
+  const vH = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov/2)) * distance;
+  const vW = vH * camera.aspect;
+  camera.matrixWorld.extractBasis(camRight, camUp, camDir);
+  out.set(0,0,0)
+     .addScaledVector(camRight, -dcx * vW)
+     .addScaledVector(camUp,    -dcy * vH);
+  return out;
+}
+
+// ============================================================
+//  AI TUTOR — typewriter + speak-aloud (browser-native, offline)
+// ============================================================
+let typeTimer = null;
+function typeText(el, text, done){
+  if (typeTimer){ clearInterval(typeTimer); typeTimer = null; }
+  el.innerHTML = '';
+  const txt = document.createTextNode('');
+  const cur = document.createElement('span');
+  cur.className = 'cursor'; cur.textContent = '▋';
+  el.appendChild(txt); el.appendChild(cur);
+  let i = 0;
+  typeTimer = setInterval(()=>{
+    i += 2;
+    txt.nodeValue = text.slice(0, i);
+    if (i >= text.length){
+      clearInterval(typeTimer); typeTimer = null;
+      cur.remove();
+      if (done) done();
+    }
+  }, 18);
+}
+function speakPart(){
+  if (!selectedPart || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(KNOWLEDGE[selectedPart].ai);
+  u.rate = 1.02; u.pitch = 1;
+  window.speechSynthesis.speak(u);
+}
+
+// ============================================================
+//  GESTURE → INTERACTION  (per mode)
+//  continuous gestures act every frame; discrete ones on `onset`
+// ============================================================
+function handleGesture(g, lm, onset){
+  if (mode === 'learn')       handleLearn(g, lm, onset);
+  else if (mode === 'design') handleDesign(g, lm, onset);
+  else                        handleDraw(g, lm, onset);
+  if (g !== 'fist') grabbing = false;
+}
+
+// ---- Learning Mode ----
+function handleLearn(g, lm, onset){
+  if (g === 'point'){
+    raycaster.setFromCamera(fingertipNDC(lm), camera);
+    const hits = raycaster.intersectObjects(heartGroup.children, false);
+    if (hits.length){
+      reticle.position.copy(hits[0].point);
+      reticle.visible = true;
+      const name = hits[0].object.name;
+      if (name === hoverPart) hoverCount++; else { hoverPart = name; hoverCount = 1; }
+      // require 2 stable frames on the same part → smooth, flicker-free selection
+      if (hoverCount >= 2 && name !== selectedPart) selectPart(hits[0].object);
+    }
+  }
+  else if (g === 'fist' && prevSmooth){
+    const c = palmCentroid(lm), p = palmCentroid(prevSmooth);
+    heartRotY += (c.x - p.x) * 5.5;
+    heartRotX += (c.y - p.y) * 5.5;
+  }
+  else if (g === 'pinch' && prevSmooth){
+    const d = dist(lm[4],lm[8]), dp = dist(prevSmooth[4],prevSmooth[8]);
+    if (dp > 0.001) zoomTarget = THREE.MathUtils.clamp(zoomTarget*(dp/d), 2.2, 9);
+  }
+  else if (g === 'open_palm'){
+    if (onset){ heartRotX = 0; heartRotY = 0; zoomTarget = 5; controls.target.set(0,0,0); }
+  }
+  else if (g === 'victory'){
+    if (onset) nextPart();
+  }
+  else if (g === 'thumbsup'){
+    if (onset) speakPart();
+  }
+  else if (g === 'three'){
+    if (onset) autoOrbit = !autoOrbit;
+  }
+}
+function selectPart(part){
+  heartGroup.children.forEach(m=>{
+    m.material.emissive.set(0x000000);
+    m.material.color.copy(m.userData.baseColor.clone().multiplyScalar(0.55));
+  });
+  part.material.emissive.copy(new THREE.Color(KNOWLEDGE[part.name].color)).multiplyScalar(0.5);
+  part.material.color.copy(part.userData.baseColor);
+  selectedPart = part.name;
+  pendingType = true;            // animate the AI response
+  renderPanel();
+}
+function nextPart(){
+  let idx = PART_ORDER.indexOf(selectedPart);
+  idx = (idx + 1) % PART_ORDER.length;
+  const name = PART_ORDER[idx];
+  const mesh = heartGroup.children.find(m=>m.name === name);
+  if (mesh) selectPart(mesh);
+}
+
+// ---- Design Mode ----
+function handleDesign(g, lm, onset){
+  if (g === 'point'){
+    raycaster.setFromCamera(fingertipNDC(lm), camera);
+    const hits = raycaster.intersectObjects(designObjects, true);
+    if (hits.length){
+      let o = hits[0].object;
+      while (o && !o.userData.isShape) o = o.parent;
+      if (o && o !== selectedObj) selectObject(o);
+    }
+  }
+  else if (g === 'fist' && selectedObj && prevSmooth){
+    grabbing = true;
+    const c = palmCentroid(lm), p = palmCentroid(prevSmooth);
+    const d = camera.position.distanceTo(selectedObj.userData.targetPos);
+    screenDeltaToWorld(c.x - p.x, c.y - p.y, d, worldDelta);
+    selectedObj.userData.targetPos.add(worldDelta);
+    renderPanelThrottled();
+  }
+  else if (g === 'open_palm' && selectedObj && prevSmooth){
+    const c = palmCentroid(lm), p = palmCentroid(prevSmooth);
+    selectedObj.userData.targetRotY += (c.x - p.x) * 6.5;
+    selectedObj.userData.targetRotX += (c.y - p.y) * 6.5;
+    renderPanelThrottled();
+  }
+  else if (g === 'pinch' && selectedObj && prevSmooth){
+    const d = dist(lm[4],lm[8]), dp = dist(prevSmooth[4],prevSmooth[8]);
+    if (dp > 0.001){
+      const f = THREE.MathUtils.clamp(d/dp, 0.92, 1.08);
+      selectedObj.userData.targetScale = THREE.MathUtils.clamp(
+        selectedObj.userData.targetScale * f, 0.15, 4);
+      renderPanelThrottled();
+    }
+  }
+  else if (g === 'victory'){ if (onset) duplicateSelected(); }
+  else if (g === 'thumbsup'){ if (onset) resetSelected(); }
+  else if (g === 'three'){ if (onset) autoOrbit = !autoOrbit; }
+}
+
+// ---- Air Draw Mode ----
+function handleDraw(g, lm, onset){
+  if (g === 'point'){
+    camera.getWorldDirection(camDir);
+    drawPlane.setFromNormalAndCoplanarPoint(camDir, scene.position);
+    raycaster.setFromCamera(fingertipNDC(lm), camera);
+    if (raycaster.ray.intersectPlane(drawPlane, hitPoint)){
+      if (!currentStroke){
+        currentStroke = newStroke();
+        lastDrawPt.copy(hitPoint);
+        pushStrokePoint(currentStroke, hitPoint);
+      } else if (hitPoint.distanceTo(lastDrawPt) > 0.025){
+        lastDrawPt.copy(hitPoint);
+        pushStrokePoint(currentStroke, hitPoint);
+      }
+    }
+  } else {
+    currentStroke = null;                       // end the stroke
+    if (g === 'victory' && onset) cycleColor();
+    if (g === 'thumbsup' && onset) undoStroke();
+  }
+}
+
+// ============================================================
+//  INFO PANEL  (throttled for FPS stability)
+// ============================================================
+const GESTURE_TXT = {
+  none:'No gesture detected', open_palm:'Open Palm', fist:'Fist',
+  pinch:'Pinch', point:'Point', victory:'Victory', thumbsup:'Thumbs Up', three:'Three'
+};
+const GUIDE = {
+  learn:`<b>Point</b> &mdash; select a part<br><b>Fist</b> &mdash; rotate model<br>
+         <b>Pinch</b> &mdash; zoom<br><b>Open&nbsp;Palm</b> &mdash; reset view<br>
+         <b>Victory</b> &mdash; next part<br><b>Thumbs&nbsp;Up</b> &mdash; hear it aloud<br>
+         <b>Three</b> &mdash; auto-rotate`,
+  design:`<b>Point</b> &mdash; select object<br><b>Fist</b> &mdash; grab &amp; move<br>
+          <b>Open&nbsp;Palm</b> &mdash; rotate object<br><b>Pinch</b> &mdash; scale object<br>
+          <b>Victory</b> &mdash; duplicate<br><b>Thumbs&nbsp;Up</b> &mdash; reset object<br>
+          <b>Three</b> &mdash; auto-rotate`,
+  draw:`<b>Point</b> &mdash; draw in the air<br><b>Victory</b> &mdash; next colour<br>
+        <b>Thumbs&nbsp;Up</b> &mdash; undo stroke<br>orbit with the mouse for 3D`
+};
+let lastPanel = 0;
+function renderPanelThrottled(){
+  const t = performance.now();
+  if (t - lastPanel > 160){ lastPanel = t; renderPanel(); }
+}
+function fmt(n){ return (n>=0?' ':'') + n.toFixed(2); }
+
+function renderPanel(){
+  guideText.innerHTML = GUIDE[mode];
+
+  if (mode === 'learn'){
+    if (selectedPart){
+      const k = KNOWLEDGE[selectedPart];
+      const hex = '#' + new THREE.Color(k.color).getHexString();
+      panelBody.innerHTML = `
+        <div>
+          <div class="aiHeader"><div class="aiDot"></div>
+            <div class="aiName">GestureLearn AI Tutor</div></div>
+          <div class="aiBubble" style="border-color:${hex}55">
+            <div class="pname" style="color:${hex}">${k.label}</div>
+            <div class="aiText" id="aiText"></div>
+            <ul class="facts hidden" id="aiFacts">${k.facts.map(f=>`<li>${f}</li>`).join('')}</ul>
+            <div class="aiHint">✌️ Victory — next part &nbsp;·&nbsp; 👍 Thumbs Up — hear it aloud</div>
+          </div>
+        </div>`;
+      const el = document.getElementById('aiText');
+      const facts = document.getElementById('aiFacts');
+      if (pendingType){
+        pendingType = false;
+        typeText(el, k.ai, ()=> facts.classList.remove('hidden'));
+      } else {
+        el.textContent = k.ai;
+        facts.classList.remove('hidden');
+      }
+    } else {
+      panelBody.innerHTML = `
+        <div>
+          <div class="aiHeader"><div class="aiDot"></div>
+            <div class="aiName">GestureLearn AI Tutor</div></div>
+          <div class="aiBubble">
+            <div class="aiText">Hi! I'm your AI tutor. <b>Point</b> at any part of
+              the 3D heart and I'll explain what it does. There are 6 labelled
+              components to explore.</div>
+          </div>
+        </div>`;
+    }
+  }
+  else if (mode === 'design'){
+    let body = '';
+    if (selectedObj){
+      const o = selectedObj, tp = o.userData.targetPos;
+      body = `<div class="sect"><div class="cap">Selected object</div>
+        <div class="card">
+          <div class="name" style="color:#33ffcc">${o.name}</div>
+          <div class="transformRow"><span>Type</span><span>${o.userData.kind}</span></div>
+          <div class="transformRow"><span>Position</span><span>${fmt(tp.x)},${fmt(tp.y)},${fmt(tp.z)}</span></div>
+          <div class="transformRow"><span>Scale</span><span>${o.userData.targetScale.toFixed(2)}x</span></div>
+          <div class="transformRow"><span>Rotation</span><span>${(o.userData.targetRotY*57.3).toFixed(0)}&deg; / ${(o.userData.targetRotX*57.3).toFixed(0)}&deg;</span></div>
+        </div></div>`;
+    } else {
+      body = `<div class="placeholder">
+        Add a shape, then <b>Point</b> to select it. <b>Fist</b> grabs &amp; moves,
+        <b>Open&nbsp;Palm</b> rotates, <b>Pinch</b> scales, <b>Victory</b> duplicates.</div>`;
+    }
+    body += `<div class="sect"><div class="cap">Workspace</div>
+      <div class="placeholder">${designObjects.length} object(s)${grabbing?' · grabbing':''}${autoOrbit?' · auto-rotate':''}</div></div>`;
+    panelBody.innerHTML = body;
+  }
+  else { // draw
+    let total = 0; for (const s of strokes) total += s.userData.count;
+    panelBody.innerHTML = `<div class="sect"><div class="cap">Air canvas</div>
+      <div class="card">
+        <div class="transformRow"><span>Strokes</span><span>${strokes.length}</span></div>
+        <div class="transformRow"><span>Points</span><span>${total}</span></div>
+        <div class="transformRow"><span>Brush</span><span style="color:${strokeColor}">${strokeColor}</span></div>
+      </div></div>
+      <div class="placeholder">Hold a <b>Point</b> gesture and move your index finger
+      to draw. <b>Victory</b> changes colour, <b>Thumbs&nbsp;Up</b> undoes a stroke.</div>`;
+  }
+}
+
+// ============================================================
+//  MODE SWITCHING + UI WIRING
+// ============================================================
+function setMode(m){
+  mode = m;
+  document.querySelectorAll('.modeBtn').forEach(b=>b.classList.toggle('active', b.dataset.mode===m));
+  heartGroup.visible  = (m==='learn');
+  designGroup.visible = (m==='design');
+  drawGroup.visible   = (m==='draw');
+  designTools.classList.toggle('hidden', m!=='design');
+  drawTools.classList.toggle('hidden', m!=='draw');
+  reticle.visible = false;
+  if (m==='learn'){
+    topbar.innerHTML = '<b>Learning Mode</b> — 3D Heart Model · Point at a part, the AI tutor explains it';
+    camera.position.set(0,0.4,5); zoomTarget = 5;
+  } else if (m==='design'){
+    topbar.innerHTML = '<b>Design Mode</b> — Gesture shape workspace · Fist to grab &amp; move';
+    camera.position.set(0,1,5.5);
+  } else {
+    topbar.innerHTML = '<b>Air Draw Mode</b> — Point your index finger to draw in 3D space';
+    camera.position.set(0,0.6,5.5);
+  }
+  controls.target.set(0,0,0);
+  currentStroke = null;
+  renderPanel();
+}
+
+document.querySelectorAll('.modeBtn').forEach(b=>b.addEventListener('click', ()=>setMode(b.dataset.mode)));
+document.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click', ()=>addShape(b.dataset.add)));
+document.querySelector('[data-act="duplicate"]').addEventListener('click', duplicateSelected);
+document.querySelector('[data-act="delete"]').addEventListener('click', deleteSelected);
+document.querySelector('[data-act="clear"]').addEventListener('click', clearShapes);
+document.querySelector('[data-act="clearDraw"]').addEventListener('click', clearDrawing);
+document.querySelector('[data-act="undoStroke"]').addEventListener('click', undoStroke);
+document.querySelectorAll('.sw').forEach(s=>s.addEventListener('click', ()=>{
+  document.querySelectorAll('.sw').forEach(x=>x.classList.remove('active'));
+  s.classList.add('active');
+  strokeColor = s.dataset.color;
+  renderPanel();
+}));
+window.addEventListener('keydown', e=>{
+  if ((e.key==='Delete'||e.key==='Backspace') && mode==='design') deleteSelected();
+});
+canvas.addEventListener('pointerdown', e=>{
+  if (mode!=='design') return;
+  const r = canvas.getBoundingClientRect();
+  const ndc = { x:((e.clientX-r.left)/r.width)*2-1, y:-((e.clientY-r.top)/r.height)*2+1 };
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(designObjects, true);
+  if (hits.length){
+    let o = hits[0].object;
+    while (o && !o.userData.isShape) o = o.parent;
+    if (o) selectObject(o);
+  }
+});
+
+// ============================================================
+//  MEDIAPIPE HAND TRACKING
+// ============================================================
+const HAND_CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+  [5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],
+  [13,17],[17,18],[18,19],[19,20],[0,17]
+];
+function drawHand(lm){
+  camCtx.clearRect(0,0,camCanvas.width,camCanvas.height);
+  if (!lm) return;
+  const W=camCanvas.width, H=camCanvas.height;
+  camCtx.strokeStyle='#00ff88'; camCtx.lineWidth=2;
+  for (const [a,b] of HAND_CONNECTIONS){
+    camCtx.beginPath();
+    camCtx.moveTo(lm[a].x*W, lm[a].y*H);
+    camCtx.lineTo(lm[b].x*W, lm[b].y*H);
+    camCtx.stroke();
+  }
+  camCtx.fillStyle='#58a6ff';
+  for (const p of lm){
+    camCtx.beginPath();
+    camCtx.arc(p.x*W, p.y*H, 3, 0, Math.PI*2);
+    camCtx.fill();
+  }
+}
+
+function onResults(results){
+  reticle.visible = false;                           // hidden unless pointing hits
+  const raw = (results.multiHandLandmarks && results.multiHandLandmarks[0]) || null;
+  const lm = smoothLandmarks(raw);
+  drawHand(lm);
+
+  const g = classify(lm);
+  if (g === rawGesture){ rawCount++; } else { rawGesture = g; rawCount = 1; }
+  if (rawCount >= STABLE_FRAMES) stableGesture = g;
+
+  const onset = (stableGesture !== lastStableG);
+  lastStableG = stableGesture;
+
+  badgeVal.textContent   = GESTURE_TXT[stableGesture] || '—';
+  curGesture.textContent = GESTURE_TXT[stableGesture] || 'No gesture detected';
+
+  if (lm && stableGesture !== 'none') handleGesture(stableGesture, lm, onset);
+  else if (mode === 'draw') currentStroke = null;
+
+  prevSmooth = lm ? lm.map(p=>({x:p.x,y:p.y,z:p.z})) : null;
+}
+
+let hands=null, mpCamera=null;
+async function startCamera(){
+  startStatus.textContent = 'Loading hand-tracking model…';
+  startBtn.disabled = true;
+  try{
+    hands = new window.Hands({ locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+    hands.setOptions({ maxNumHands:1, modelComplexity:1,
+      minDetectionConfidence:0.7, minTrackingConfidence:0.6 });
+    hands.onResults(onResults);
+    mpCamera = new window.Camera(video, {
+      onFrame: async ()=>{ await hands.send({ image: video }); },
+      width:320, height:240
+    });
+    await mpCamera.start();
+    camHint.classList.add('hidden');
+    startOverlay.classList.add('hidden');
+  }catch(err){
+    startStatus.textContent = 'Camera error: ' + err.message;
+    startBtn.disabled = false;
+  }
+}
+startBtn.addEventListener('click', startCamera);
+
+// ============================================================
+//  RENDER LOOP — target-based lerp smoothing + FPS guard
+// ============================================================
+let fpsT = performance.now(), fpsN = 0;
+function loop(){
+  requestAnimationFrame(loop);
+
+  // smooth design objects toward their interaction targets
+  for (const o of designObjects){
+    const u = o.userData;
+    o.position.lerp(u.targetPos, 0.20);
+    o.rotation.x += (u.targetRotX - o.rotation.x) * 0.16;
+    o.rotation.y += (u.targetRotY - o.rotation.y) * 0.16;
+    const s = u.targetScale;
+    o.scale.x += (s - o.scale.x) * 0.20;
+    o.scale.y += (s - o.scale.y) * 0.20;
+    o.scale.z += (s - o.scale.z) * 0.20;
+  }
+  if (selBox) selBox.update();
+
+  // auto-rotate the active group (presentation mode)
+  if (autoOrbit){
+    if (mode === 'learn')       heartRotY += 0.006;
+    else if (mode === 'design') designGroup.rotation.y += 0.006;
+    else                        drawGroup.rotation.y += 0.006;
+  }
+
+  // smooth the learning-mode model rotation + zoom
+  heartGroup.rotation.x += (heartRotX - heartGroup.rotation.x) * 0.16;
+  heartGroup.rotation.y += (heartRotY - heartGroup.rotation.y) * 0.16;
+  if (mode === 'learn' && Math.abs(zoomTarget - camera.position.z) > 0.01){
+    camera.position.z += (zoomTarget - camera.position.z) * 0.12;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+
+  fpsN++;
+  const now = performance.now();
+  if (now - fpsT >= 500){
+    fpsVal.textContent = Math.round(fpsN * 1000 / (now - fpsT)) + ' fps';
+    fpsT = now; fpsN = 0;
+  }
+}
+resize();
+renderPanel();
+setMode('learn');
+loop();
+</script>
+</body>
+</html>
